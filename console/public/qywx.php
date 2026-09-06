@@ -69,7 +69,33 @@
     $corpid = $noti_corpid;
     $corpsecret = $noti_corpsecret;
     $noti_text = $_GET["noti_text"];
-    
+
+    // Webhook 模式：corpid 字段填的是企业微信群机器人 Webhook 地址（http/https 开头）时，
+    // 直接 POST 文本消息到群机器人，无需自建应用的 corpid/corpsecret/agentid/touser
+    if (stripos($corpid, 'http') === 0) {
+
+        $webhookPostdata = array(
+            'msgtype' => 'text',
+            'text' => array(
+                'content' => $noti_text
+            )
+        );
+
+        $webhookOptions = array(
+            'http' => array(
+                'header'  => "Content-type: application/json",
+                'method'  => 'POST',
+                'content' => json_encode($webhookPostdata, JSON_UNESCAPED_UNICODE),
+                'timeout' => 5
+            )
+        );
+
+        $webhookContext = stream_context_create($webhookOptions);
+        $webhookResponse = file_get_contents($corpid, false, $webhookContext);
+        echo $webhookResponse;
+        exit;
+    }
+
     // 要发送的应用消息数据
     $postdata = array(
         'touser' => $noti_touser, // 接收者的用户ID
