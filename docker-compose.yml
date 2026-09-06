@@ -10,6 +10,7 @@ services:
       - "8080:80"               # 左边是 NAS 对外端口，冲突就改成别的（如 8088）
     volumes:
       - ./:/var/www/html                          # 整个项目源码：改代码即时生效；安装器生成的 console/Db.php、二维码图片 upload/ 也落在这里
+      - ./docker/php.ini:/usr/local/etc/php/conf.d/zz-custom.ini:ro   # PHP 配置（output_buffering，修复中转页 header 报错）
       - ./data/sessions:/var/lib/php/sessions     # PHP 会话（登录态），容器重建不丢
       - ./data/logs/apache2:/var/log/apache2      # Apache 访问/错误日志，排错用
     depends_on:
