@@ -10,6 +10,7 @@
 |---|---|
 | `Dockerfile` | web 运行环境：PHP 7.4 + Apache + pdo_mysql + mysqli + rewrite |
 | `docker-compose.yml` | 两个服务：`web`（本镜像）+ `db`（mysql:5.7，用 NAS 上已有镜像） |
+| `docker/php.ini` | PHP 配置（`output_buffering=4096`），以只读方式挂载进容器，**位置和文件名不能改** |
 | `.dockerignore` | 构建时排除无关文件 |
 | `ylb-web_2.4.6.tar` | 预构建的 amd64 镜像包（不想在 NAS 上构建就用它） |
 
@@ -106,11 +107,18 @@ sudo docker ps --format "table {{.Names}}\t{{.Ports}}" | grep 8080
 本仓库的 `docker-compose.yml` 已通过 `--character-set-server=utf8mb4` 修复。
 **但已经乱掉的数据不可逆，必须清库重装**（按第六节操作后重新安装）。
 
-### 3. 提示「请勿重复安装」
+### 3. 活码跳转报 `Cannot modify header information - headers already sent`
+
+原因：中转页（`common/*/redirect/index.php`）先输出 HTML 再调 `header()` 跳转，官方 php 镜像默认
+`output_buffering=0` 导致报错（原作宝塔环境默认开启缓冲所以没这问题）。
+本仓库已通过挂载 `docker/php.ini`（`output_buffering=4096`）修复。
+注意：**该文件必须位于项目目录的 `docker/php.ini`**，compose 以相对路径挂载，改名/挪位置都会失效。
+
+### 4. 提示「请勿重复安装」
 
 安装锁未删。删除 `install/install.lock` 和 `console/Db.php` 后刷新安装页。
 
-### 4. 安装页提示目录不可写
+### 5. 安装页提示目录不可写
 
 File Station 里给 `console/`、`upload/`（没有就建一个）目录设置可写权限；或 SSH：
 
@@ -119,7 +127,7 @@ cd /volume1/docker/ylb
 chmod -R 777 console upload
 ```
 
-### 5. 想改 MySQL root 密码
+### 6. 想改 MySQL root 密码
 
 改 compose 里 `MYSQL_ROOT_PASSWORD` 后，需同时删除 `./data/mysql/` 重建（密码随初始化写入），并重装系统；或装完后在 MySQL 里改密码并同步修改 `console/Db.php`。
 
