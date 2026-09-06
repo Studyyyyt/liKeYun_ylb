@@ -1,0 +1,49 @@
+# 私域引流宝 docker compose 部署（群晖 NAS）
+# 所有持久化数据全部 bind mount 到项目目录下 ./data/，清除数据 = 删文件夹
+# 群晖 Container Manager「项目」可直接使用本文件
+services:
+  web:
+    image: ylb-web:2.4.6        # 本地预构建并导入 NAS 的镜像
+    # build: .                  # 如需在服务器上直接构建，取消本行注释并删除上一行 image
+    container_name: ylb-web
+    ports:
+      - "8080:80"               # 左边是 NAS 对外端口，冲突就改成别的（如 8088）
+    volumes:
+      - ./:/var/www/html                          # 整个项目源码：改代码即时生效；安装器生成的 console/Db.php、二维码图片 upload/ 也落在这里
+      - ./data/sessions:/var/lib/php/sessions     # PHP 会话（登录态），容器重建不丢
+      - ./data/logs/apache2:/var/log/apache2      # Apache 访问/错误日志，排错用
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mysql:5.7            # 使用 NAS 本地已有的 mysql:5.7 镜像，本地存在则不会联网拉取
+    container_name: ylb-db
+    # 关键：指定服务端默认字符集为 utf8mb4。
+    # 安装器的 mysqli 连接未显式设置字符集，会沿用服务端默认（默认 latin1 导致中文乱码入库）
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: root123    # 生产环境请修改
+      MYSQL_DATABASE: ylb
+      TZ: Asia/Shanghai
+    volumes:
+      - ./data/mysql:/var/lib/mysql               # 数据库文件，落到宿主机 data/mysql 目录
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot123"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+# ── 数据都存在哪里（项目目录下）──────────────────────────────
+# ./data/mysql          数据库（清除 = 重装系统）
+# ./data/sessions       登录会话
+# ./data/logs/apache2   Web 日志
+# ./                    项目源码 + 安装生成的 console/Db.php + upload/ 上传的二维码图片
+#
+# ── 想彻底重装 ────────────────────────────────────────────
+# 1. 停止项目
+# 2. 删除整个 ./data/ 目录
+# 3. 删除 install/install.lock 和 console/Db.php
+# 4. 启动项目，重新访问 /install/ 安装
